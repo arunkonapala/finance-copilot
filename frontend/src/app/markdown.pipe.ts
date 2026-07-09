@@ -27,7 +27,7 @@ export class MarkdownPipe implements PipeTransform {
     };
     for (const line of lines) {
       const h = line.match(/^(#{1,4})\s+(.*)$/);
-      const ul = line.match(/^\s*[-•]\s+(.*)$/);
+      const ul = line.match(/^\s*[-•*+]\s+(.*)$/);
       const ol = line.match(/^\s*\d+[.)]\s+(.*)$/);
       if (h) {
         closeList();
