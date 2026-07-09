@@ -1,0 +1,85 @@
+<div class="shell">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◆</span>
+      <div>
+        <h1>Finance Copilot</h1>
+        <p>Your money, explained</p>
+      </div>
+    </div>
+    @if (summary(); as s) {
+      <div class="cards">
+        <div class="card">
+          <span class="card-label">Net worth</span>
+          <span class="card-value">${{ s.net_worth | number: '1.0-0' }}</span>
+        </div>
+        <div class="card">
+          <span class="card-label">Spent this month</span>
+          <span class="card-value">${{ s.spent_this_month | number: '1.0-0' }}</span>
+        </div>
+        <div class="card">
+          <span class="card-label">Bills due soon</span>
+          <span class="card-value">
+            {{ s.bills_due_soon }}
+            @if (s.next_bill) {
+              <small>next: {{ s.next_bill.name }}</small>
+            }
+          </span>
+        </div>
+      </div>
+    }
+  </header>
+
+  <main class="chat" #scroller>
+    @if (messages().length === 0) {
+      <div class="welcome">
+        <h2>Hi Alex 👋 What can I help you with today?</h2>
+        <p>I can see your accounts, transactions, budgets, bills, and portfolio.</p>
+        <div class="chips">
+          @for (s of suggestions; track s) {
+            <button class="chip" (click)="ask(s)">{{ s }}</button>
+          }
+        </div>
+      </div>
+    }
+
+    @for (msg of messages(); track $index) {
+      <div class="row" [class.user]="msg.role === 'user'">
+        <div class="bubble" [class.error]="msg.error">
+          @if (msg.tools.length > 0) {
+            <div class="tool-trace">
+              @for (t of msg.tools; track $index) {
+                <span class="tool-pill">⚙ {{ t }}</span>
+              }
+            </div>
+          }
+          @if (msg.role === 'assistant') {
+            <div class="md" [innerHTML]="msg.text | markdown"></div>
+          } @else {
+            <p>{{ msg.text }}</p>
+          }
+        </div>
+      </div>
+    }
+
+    @if (status(); as st) {
+      <div class="row">
+        <div class="bubble status-bubble">
+          <span class="spinner"></span> {{ st }}
+        </div>
+      </div>
+    }
+  </main>
+
+  <footer class="composer">
+    <textarea
+      [(ngModel)]="draft"
+      (keydown)="onKeydown($event)"
+      placeholder="Ask about your spending, budget, bills, or investments…"
+      rows="1"
+    ></textarea>
+    <button class="send" (click)="send()" [disabled]="busy() || !draft.trim()">
+      {{ busy() ? '…' : 'Send' }}
+    </button>
+  </footer>
+</div>
