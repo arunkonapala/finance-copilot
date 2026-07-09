@@ -30,6 +30,26 @@ backend (FastAPI, :8000)
 
 Conversation history (including tool_use/tool_result blocks) is kept server-side per `session_id`, so follow-up questions retain full context.
 
+## How the dashboard cards are computed
+
+On page load the frontend calls `GET /api/summary` (`summary()` in
+`backend/main.py`). The numbers are computed live from the same data source
+the chat tools use, so chat answers always agree with the header cards:
+
+| Card | Computation |
+|---|---|
+| **Net worth** | Sum of all `ACCOUNTS` balances in `data.py`. The credit-card balance is stored negative, so debt is subtracted automatically. |
+| **Spent this month** | Sum of negative-amount `TRANSACTIONS` whose date falls in the current month (negative = spending, positive = income). |
+| **Bills due soon** | `_get_bills()` computes each bill's next due date from its `due_day`; bills due within the next 10 days count, and the soonest one is shown as "next". |
+
+The underlying data is a fake bank in `data.py`: accounts, budgets, bills,
+and the portfolio are hardcoded, while ~6 months of transactions are
+generated with a fixed seed (`random.seed(42)`) — salary twice a month,
+bills posting on their due days, and randomized merchant purchases with a
+deliberate dining-out uptrend so spending analysis has a real pattern to
+find. Swap `data.py` for a bank aggregator (e.g. Plaid) and the dashboard,
+tools, and chat all work unchanged.
+
 ## Run it
 
 ### Backend
