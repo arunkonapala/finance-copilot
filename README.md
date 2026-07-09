@@ -88,6 +88,33 @@ Ollama at `http://localhost:11434/v1`, …). Caveat: free models are noticeably
 less reliable at multi-tool calls, and this path lacks Claude's adaptive
 thinking and prompt caching — judge answer quality on the Anthropic path.
 
+## Privacy & data safety
+
+This repo ships with **synthetic data only** (`data.py`) — nothing real is at
+risk while demoing. If you connect real financial data, know the trade-offs:
+
+- **Everything the tools return is sent to the model provider.** Chat
+  messages and tool results (balances, transactions) go to whichever LLM the
+  backend uses. Choose accordingly:
+  - *Free endpoints (Groq, etc.)* — weaker data commitments; use for
+    development against fake data, not real finances.
+  - *Anthropic API* — API inputs/outputs are not used for training by
+    default; the standard choice for real data.
+  - *Local (Ollama)* — data never leaves your machine; weaker tool calling.
+- **Keep credentials away from the LLM.** With an aggregator like Plaid, bank
+  logins go to the aggregator and your server holds an access token. The
+  model should only ever see descriptions and amounts — strip account
+  numbers and identifiers in the tool layer before results are returned.
+- **Minimize what you send.** Prefer aggregates (`analyze_spending`) over raw
+  transaction dumps where possible.
+- **Tools are read-only by design** (the one write, `set_bill_reminder`, is
+  an in-memory demo stub). Keep money-moving actions out of tool reach, or
+  gate them behind explicit human confirmation — transaction text is
+  external input and a prompt-injection surface.
+- **Local use only, as shipped.** Conversations live in server memory (gone
+  on restart) and nothing is persisted, but there is no auth or TLS — add
+  both before deploying anywhere public.
+
 ## Notes
 
 - Model: `claude-opus-4-8` with `thinking: {type: "adaptive"}` and a cached system prompt (`cache_control: ephemeral`).
