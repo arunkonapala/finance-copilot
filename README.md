@@ -51,6 +51,23 @@ npm start                   # serves on http://localhost:4200
 
 Open http://localhost:4200 — the dashboard cards load from `/api/summary`; chat requires the API key.
 
+## Testing without an Anthropic key (free models)
+
+The backend has a second, OpenAI-compatible agent path for testing the
+plumbing (tool loop, streaming, UI) on free endpoints. In `backend/.env`:
+
+```bash
+LLM_PROVIDER=openai
+LLM_API_KEY=gsk_...                          # free key from console.groq.com
+# LLM_BASE_URL=https://api.groq.com/openai/v1   (default)
+# LLM_MODEL=llama-3.3-70b-versatile             (default)
+```
+
+Works with any OpenAI-compatible endpoint (Groq, Gemini's compatibility API,
+Ollama at `http://localhost:11434/v1`, …). Caveat: free models are noticeably
+less reliable at multi-tool calls, and this path lacks Claude's adaptive
+thinking and prompt caching — judge answer quality on the Anthropic path.
+
 ## Notes
 
 - Model: `claude-opus-4-8` with `thinking: {type: "adaptive"}` and a cached system prompt (`cache_control: ephemeral`).

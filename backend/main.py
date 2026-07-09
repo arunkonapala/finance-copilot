@@ -1,18 +1,28 @@
 """FastAPI backend for the personal finance copilot."""
 
 import json
+import os
 import uuid
 from collections import defaultdict
 from datetime import date
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from agent import stream_turn
 from data import ACCOUNTS, TRANSACTIONS
 from tools import _get_bills
+
+load_dotenv()
+
+# Provider switch: "anthropic" (default, agent.py) or "openai" — any
+# OpenAI-compatible endpoint, e.g. Groq's free tier (agent_openai.py).
+if os.getenv("LLM_PROVIDER", "anthropic").lower() == "openai":
+    from agent_openai import stream_turn
+else:
+    from agent import stream_turn
 
 app = FastAPI(title="Personal Finance Copilot")
 
