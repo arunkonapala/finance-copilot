@@ -13,3 +13,6 @@ frontend/.angular/
 .DS_Store
 .vscode/
 .idea/
+
+# Deploy
+backend/static/

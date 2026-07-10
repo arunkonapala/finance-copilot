@@ -17,7 +17,9 @@ export interface Summary {
   accounts: { name: string; type: string; balance: number }[];
 }
 
-const API = 'http://localhost:8000';
+// Same-origin in production (backend serves the built frontend);
+// localhost:8000 only when running `ng serve` against a local backend.
+const API = location.port === '4200' ? 'http://localhost:8000' : '';
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
@@ -31,7 +33,7 @@ export class ChatService {
       body: JSON.stringify({ session_id: this.sessionId, message }),
     });
     if (!res.ok || !res.body) {
-      throw new Error(`Backend returned ${res.status}. Is the API running on :8000?`);
+      throw new Error(`Backend returned ${res.status}.`);
     }
     const reader = res.body.getReader();
     const decoder = new TextDecoder();

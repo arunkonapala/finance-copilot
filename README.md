@@ -50,6 +50,21 @@ deliberate dining-out uptrend so spending analysis has a real pattern to
 find. Swap `data.py` for a bank aggregator (e.g. Plaid) and the dashboard,
 tools, and chat all work unchanged.
 
+## Deploy (Render, free tier)
+
+One Docker service serves both the API and the built Angular app
+(same-origin, so no CORS config in production).
+
+1. Fork/connect this repo on [Render](https://render.com) → **New → Blueprint**
+   (`render.yaml` configures everything: Docker build, health check, env vars).
+2. Set the one secret env var when prompted: `LLM_API_KEY` — a free Groq key
+   from console.groq.com.
+3. Deploy. The demo runs on Groq (`llama-3.3-70b-versatile`) with the
+   synthetic dataset in `backend/data.py` — no real financial data anywhere.
+
+To point the same image at Anthropic instead: set `LLM_PROVIDER=anthropic`
+and `ANTHROPIC_API_KEY`.
+
 ## Run it
 
 ### Backend

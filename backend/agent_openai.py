@@ -16,6 +16,8 @@ quality against agent.py, not this adapter.
 
 import json
 import os
+import re
+import time
 from typing import Generator
 
 import openai
@@ -49,42 +51,72 @@ client = openai.OpenAI(
 )
 
 
+def _stream_round(messages: list) -> Generator[dict, None, tuple]:
+    """Stream one model round, yielding UI events; returns the round result."""
+    stream = client.chat.completions.create(
+        model=MODEL,
+        messages=[{"role": "system", "content": SYSTEM_PROMPT}, *messages],
+        tools=OPENAI_TOOLS,
+        stream=True,
+    )
+    text_parts: list[str] = []
+    calls: dict[int, dict] = {}
+    finish = None
+    for chunk in stream:
+        if not chunk.choices:
+            continue
+        choice = chunk.choices[0]
+        delta = choice.delta
+        if delta and delta.content:
+            text_parts.append(delta.content)
+            yield {"type": "delta", "text": delta.content}
+        if delta and delta.tool_calls:
+            for tc in delta.tool_calls:
+                entry = calls.setdefault(tc.index, {"id": "", "name": "", "args": ""})
+                if tc.id:
+                    entry["id"] = tc.id
+                if tc.function and tc.function.name:
+                    entry["name"] = tc.function.name
+                    yield {"type": "tool", "name": entry["name"],
+                           "label": TOOL_LABELS.get(entry["name"], f"Running {entry['name']}")}
+                if tc.function and tc.function.arguments:
+                    entry["args"] += tc.function.arguments
+        if choice.finish_reason:
+            finish = choice.finish_reason
+    return text_parts, calls, finish
+
+
+def _is_flaky_generation(exc: openai.APIError) -> bool:
+    """Groq rejects the model's own malformed output (e.g. a garbled tool
+    name) with a validation APIError — retrying the round usually fixes it."""
+    text = str(exc)
+    return "tool call validation failed" in text or "failed_generation" in text
+
+
 def stream_turn(messages: list) -> Generator[dict, None, None]:
     """Run one user turn to completion, mutating `messages` in place.
     History is kept in chat-completions format (role/content/tool_calls)."""
     try:
         for _ in range(MAX_TOOL_ROUNDS):
-            stream = client.chat.completions.create(
-                model=MODEL,
-                messages=[{"role": "system", "content": SYSTEM_PROMPT}, *messages],
-                tools=OPENAI_TOOLS,
-                stream=True,
-            )
-
-            text_parts: list[str] = []
-            calls: dict[int, dict] = {}
-            finish = None
-            for chunk in stream:
-                if not chunk.choices:
-                    continue
-                choice = chunk.choices[0]
-                delta = choice.delta
-                if delta and delta.content:
-                    text_parts.append(delta.content)
-                    yield {"type": "delta", "text": delta.content}
-                if delta and delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        entry = calls.setdefault(tc.index, {"id": "", "name": "", "args": ""})
-                        if tc.id:
-                            entry["id"] = tc.id
-                        if tc.function and tc.function.name:
-                            entry["name"] = tc.function.name
-                            yield {"type": "tool", "name": entry["name"],
-                                   "label": TOOL_LABELS.get(entry["name"], f"Running {entry['name']}")}
-                        if tc.function and tc.function.arguments:
-                            entry["args"] += tc.function.arguments
-                if choice.finish_reason:
-                    finish = choice.finish_reason
+            for attempt in range(3):
+                try:
+                    text_parts, calls, finish = yield from _stream_round(messages)
+                    break
+                except openai.RateLimitError as exc:
+                    # Free-tier TPM window mid-turn: wait it out and resume
+                    # the round instead of failing the whole conversation.
+                    if attempt == 2:
+                        raise
+                    match = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", str(exc))
+                    wait = (int(match.group(1) or 0) * 60 + float(match.group(2)) + 1) if match else 15.0
+                    if wait > 45:
+                        raise  # daily cap or long window — surface the error
+                    time.sleep(wait)
+                except openai.APIError as exc:
+                    # Only auto-retry flaky generations; anything else (or a
+                    # third strike) propagates to the handlers below.
+                    if attempt == 2 or not _is_flaky_generation(exc):
+                        raise
 
             if calls and finish == "tool_calls":
                 ordered = [calls[i] for i in sorted(calls)]
@@ -123,3 +155,7 @@ def stream_turn(messages: list) -> Generator[dict, None, None]:
         yield {"type": "error", "message": f"API error ({exc.status_code}): {exc.message}"}
     except openai.APIConnectionError:
         yield {"type": "error", "message": f"Could not reach {BASE_URL}. Check your connection."}
+    except openai.APIError as exc:
+        # Base-class catch-all (e.g. Groq generation-validation errors that
+        # survived the retries) — fail the turn gracefully, not the stream.
+        yield {"type": "error", "message": f"The model hit a glitch ({type(exc).__name__}). Please try again."}

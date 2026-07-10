@@ -85,3 +85,12 @@ def summary():
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+# In production the built Angular app is served same-origin from ./static
+# (populated by the Dockerfile). Mounted last so /api/* wins the routes.
+_STATIC = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(_STATIC):
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/", StaticFiles(directory=_STATIC, html=True), name="frontend")
