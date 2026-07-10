@@ -3,3 +3,6 @@ uvicorn[standard]==0.34.2
 anthropic>=0.100.0
 openai>=1.60.0
 python-dotenv==1.1.0
+
+# Optional observability layer (spans + token/cost attribution per turn).
+# agentobs @ git+https://github.com/arunkonapala/agent-observability

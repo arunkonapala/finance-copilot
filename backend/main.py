@@ -13,9 +13,14 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from data import ACCOUNTS, TRANSACTIONS
+from obs import init_tracing
 from tools import _get_bills
 
 load_dotenv()
+
+# Spans per turn/LLM round/tool call with token+cost attribution.
+# No-op unless AGENTOBS_EXPORTER is set (console | otlp).
+init_tracing("finance-copilot")
 
 # Provider switch: "anthropic" (default, agent.py) or "openai" — any
 # OpenAI-compatible endpoint, e.g. Groq's free tier (agent_openai.py).

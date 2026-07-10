@@ -15,6 +15,7 @@ from typing import Generator
 import anthropic
 from dotenv import load_dotenv
 
+from obs import agent_turn, llm_call, record_llm_usage, tool_call
 from prompts import SYSTEM_PROMPT
 from tools import TOOL_LABELS, TOOLS, execute_tool
 
@@ -30,8 +31,9 @@ def stream_turn(messages: list) -> Generator[dict, None, None]:
     """Run one user turn to completion, mutating `messages` in place so the
     caller's session history keeps the full tool-use trace."""
     try:
+      with agent_turn("chat", history_len=len(messages)):
         for _ in range(MAX_TOOL_ROUNDS):
-            with client.messages.stream(
+            with llm_call(MODEL) as llm_span, client.messages.stream(
                 model=MODEL,
                 max_tokens=64000,
                 system=[{
@@ -55,6 +57,15 @@ def stream_turn(messages: list) -> Generator[dict, None, None]:
                           and event.delta.type == "text_delta"):
                         yield {"type": "delta", "text": event.delta.text}
                 response = stream.get_final_message()
+                if llm_span is not None:
+                    usage = response.usage
+                    record_llm_usage(
+                        llm_span, MODEL,
+                        input_tokens=usage.input_tokens,
+                        output_tokens=usage.output_tokens,
+                        cache_read_tokens=usage.cache_read_input_tokens or 0,
+                        cache_write_tokens=usage.cache_creation_input_tokens or 0,
+                    )
 
             # Preserve the full content blocks (thinking + tool_use) in history.
             messages.append({"role": "assistant", "content": response.content})
@@ -66,7 +77,8 @@ def stream_turn(messages: list) -> Generator[dict, None, None]:
                 tool_results = []
                 for block in response.content:
                     if block.type == "tool_use":
-                        result = execute_tool(block.name, block.input or {})
+                        with tool_call(block.name):
+                            result = execute_tool(block.name, block.input or {})
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,
