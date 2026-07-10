@@ -1,5 +1,9 @@
 # Personal Finance Copilot
 
+**Live demo:** https://finance-copilot-jito.onrender.com — synthetic data,
+runs on Groq's free tier. (Free-tier hosting sleeps when idle; the first
+visit may take ~1 minute to wake.)
+
 A conversational personal-finance assistant: **FastAPI + Anthropic Claude** backend with tool use and SSE streaming, and an **Angular 20** chat frontend.
 
 ## Capabilities
